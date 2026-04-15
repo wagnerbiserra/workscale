@@ -1,9 +1,6 @@
 from firebase_config import db
 
-# Criar um teste no banco
-db.collection("teste").document("teste1").set({
-    "nome": "Wagner",
-    "status": "ok"
-})
+print("Testando conexão...")
 
-print("🔥 Gravou no Firebase com sucesso!")
+usuarios = list(db.collection("usuarios").stream())
+print(f"Total usuários: {len(usuarios)}")
