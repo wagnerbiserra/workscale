@@ -8,3 +8,5 @@ firebase_key.json
 
 # Streamlit secrets (local)
 .streamlit/secrets.toml
+
+.idea/

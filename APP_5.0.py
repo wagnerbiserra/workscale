@@ -8,16 +8,11 @@ from firebase_config import db
 st.set_page_config(page_title="WorkScale", layout="wide")
 
 # ------------------------
-# SIDEBAR (ÚNICO MENU)
+# SIDEBAR
 # ------------------------
 st.sidebar.title("🔐 WorkScale")
 
-modo = st.sidebar.radio(
-    "Acesso",
-    ["Login", "Cadastro"],
-    key="menu_principal"
-)
-
+modo = st.sidebar.radio("Acesso", ["Login", "Cadastro"], key="menu_principal")
 email = st.sidebar.text_input("Email", key="email_input")
 
 # ------------------------
@@ -95,7 +90,7 @@ user = st.session_state.user
 st.success(f"👋 Bem-vindo {user['nome']}")
 
 # ------------------------
-# CARREGAR EVENTOS
+# EVENTOS
 # ------------------------
 if "eventos" not in st.session_state:
     doc = db.collection("usuarios").document(user["email"]).get()
@@ -152,7 +147,7 @@ feriados = get_feriados(ano, estado)
 feriados_mes = {d: nome for d, nome in feriados.items() if d.month == mes}
 
 # ------------------------
-# EMENDAS
+# EMENDAS CORRETAS
 # ------------------------
 emendas = {}
 for d in feriados_mes:
@@ -160,6 +155,13 @@ for d in feriados_mes:
         emendas[d + timedelta(days=1)] = "Emenda"
     elif d.weekday() == 1:
         emendas[d - timedelta(days=1)] = "Emenda"
+
+feriados_uteis = [d for d in feriados_mes if d.weekday() < 5]
+
+emendas_uteis = [
+    d for d in emendas
+    if d.weekday() < 5 and d not in feriados_uteis
+] if usar_emenda else []
 
 # ------------------------
 # EVENTOS FIXOS
@@ -172,7 +174,7 @@ eventos_fixos = [
 if usar_emenda:
     eventos_fixos += [
         {"title": "🔗 Emenda", "start": d.isoformat(), "color": "#9467bd"}
-        for d in emendas
+        for d in emendas_uteis
     ]
 
 # ------------------------
@@ -187,14 +189,38 @@ calendar_result = st_calendar(
 )
 
 # ------------------------
+# BOTÃO LIMPAR
+# ------------------------
+colA, colB = st.columns([1, 4])
+with colA:
+    if st.button("🗑️ Limpar"):
+        st.session_state.eventos = []
+        db.collection("usuarios").document(user["email"]).update({"eventos": []})
+        st.rerun()
+
+# ------------------------
 # CLICK
 # ------------------------
+# ------------------------
+# CLICK (CORRIGIDO)
+# ------------------------
+if "last_click" not in st.session_state:
+    st.session_state.last_click = None
+
 if calendar_result.get("dateClick"):
     data_str = calendar_result["dateClick"]["date"].split("T")[0]
 
-    st.session_state.eventos = [
-        e for e in st.session_state.eventos if e["start"] != data_str
-    ]
+    # Evita loop de clique duplicado
+    if st.session_state.last_click == data_str:
+        st.session_state.last_click = None
+        st.stop()
+
+    st.session_state.last_click = data_str
+
+    evento_existente = next(
+        (e for e in st.session_state.eventos if e["start"] == data_str),
+        None
+    )
 
     cores = {
         "🔵": "#1f77b4",
@@ -206,20 +232,26 @@ if calendar_result.get("dateClick"):
 
     cor = next((cores[k] for k in cores if k in tipo_dia), "#000000")
 
-    st.session_state.eventos.append({
-        "title": tipo_dia,
-        "start": data_str,
-        "color": cor
-    })
+    if evento_existente:
+        if evento_existente["title"] == tipo_dia:
+            st.session_state.eventos.remove(evento_existente)
+        else:
+            evento_existente["title"] = tipo_dia
+            evento_existente["color"] = cor
+    else:
+        st.session_state.eventos.append({
+            "title": tipo_dia,
+            "start": data_str,
+            "color": cor
+        })
 
     db.collection("usuarios").document(user["email"]).update({
         "eventos": st.session_state.eventos
     })
 
     st.rerun()
-
 # ------------------------
-# CONTAGEM
+# CONTAGEM CORRETA
 # ------------------------
 presencial = planejado = home = ferias = banco = 0
 
@@ -239,13 +271,9 @@ for e in st.session_state.eventos:
         elif "Banco" in t:
             banco += 1
 
-feriados_count = sum(1 for d in feriados_mes if d.weekday() < 5)
-emendas_count = sum(1 for d in emendas if d.weekday() < 5) if usar_emenda else 0
+total_nao_uteis = len(feriados_uteis) + len(emendas_uteis)
 
-total_nao_uteis = feriados_count + emendas_count
-
-dias_validos = uteis - (total_nao_uteis + ferias + banco)
-
+dias_validos = max(uteis - (total_nao_uteis + ferias + banco), 0)
 meta = int(dias_validos * 0.6)
 
 restante = meta - presencial
@@ -258,8 +286,8 @@ st.subheader("📊 Resultado")
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 Úteis", uteis)
-c2.metric("🎉 Feriados", feriados_count)
-c3.metric("🔗 Emendas", emendas_count)
+c2.metric("🎉 Feriados", len(feriados_uteis))
+c3.metric("🔗 Emendas", len(emendas_uteis))
 c4.metric("📊 Não úteis", total_nao_uteis)
 
 c5, c6, c7, c8 = st.columns(4)
@@ -301,48 +329,35 @@ if user.get("tipo") == "gestor":
         nome = dados.get("nome")
         eventos = dados.get("eventos", [])
 
-        pres = plan = fer = ban = 0
+        pres = plan = 0
+        dias_pres = []
+        dias_plan = []
 
         for e in eventos:
             d = date.fromisoformat(e["start"])
 
             if d.weekday() < 5:
-                t = e["title"]
-                if "🔵" in t:
+                if "🔵" in e["title"]:
                     pres += 1
-                elif "🟡" in t:
+                    dias_pres.append(d.strftime("%d/%m"))
+                elif "🟡" in e["title"]:
                     plan += 1
-                elif "Férias" in t:
-                    fer += 1
-                elif "Banco" in t:
-                    ban += 1
-
-        meta_m = int((uteis - (total_nao_uteis + fer + ban)) * 0.6)
-
-        r_real = meta_m - pres
-        r_prev = meta_m - (pres + plan)
+                    dias_plan.append(d.strftime("%d/%m"))
 
         st.subheader(f"👤 {nome}")
 
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2 = st.columns(2)
         c1.metric("Real", pres)
         c2.metric("Planejado", plan)
-        c3.metric("Meta", meta_m)
-        c4.metric("Faltam", max(r_real, 0))
 
-        if r_real <= 0:
-            st.success("OK")
-        elif r_prev <= 0:
-            st.info("OK previsto")
-        else:
-            st.warning("Risco")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**🔵 Dias Presenciais:**")
+            st.write(", ".join(dias_pres) if dias_pres else "-")
+
+        with col2:
+            st.markdown("**🟡 Dias Planejados:**")
+            st.write(", ".join(dias_plan) if dias_plan else "-")
 
         st.divider()
-
-# ------------------------
-# LIMPAR
-# ------------------------
-if st.button("🗑️ Limpar calendário"):
-    st.session_state.eventos = []
-    db.collection("usuarios").document(user["email"]).update({"eventos": []})
-    st.rerun()
