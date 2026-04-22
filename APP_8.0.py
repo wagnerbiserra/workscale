@@ -34,7 +34,7 @@ def verificar_senha(senha, hash_salvo):
 st.sidebar.title("🔐 WorkScale")
 
 modo = st.sidebar.radio("Acesso", ["Login", "Cadastro"])
-email = st.sidebar.text_input("Email")
+email = st.sidebar.text_input("Email").strip().lower()
 
 # ------------------------
 # CADASTRO
@@ -69,10 +69,10 @@ if modo == "Cadastro":
 
                 db.collection("usuarios").document(email).set({
                     "nome": nome,
-                    "email": email,
+                    "email": email.strip().lower(),
                     "senha": hash_senha(senha),
                     "tipo": "gestor" if tipo_usuario == "👨‍💼 Gestor" else "funcionario",
-                    "gestor": gestor,
+                    "gestor": gestor.strip().lower(),
                     "eventos": []
                 })
 
@@ -105,25 +105,33 @@ if modo == "Login":
             st.sidebar.error("Usuário não encontrado")
 
 # ------------------------
-# RESET SENHA
+# ALTERAR SENHA (SEGURO)
 # ------------------------
 st.sidebar.divider()
-st.sidebar.subheader("🔄 Criar/Atualizar senha")
+st.sidebar.subheader("🔒 Alterar senha")
 
-email_reset = st.sidebar.text_input("Email", key="reset_email")
-nova_senha = st.sidebar.text_input("Nova senha", type="password")
+if "user" in st.session_state:
 
-if st.sidebar.button("Salvar senha"):
+    senha_atual = st.sidebar.text_input("Senha atual", type="password")
+    nova_senha = st.sidebar.text_input("Nova senha", type="password")
 
-    ref = db.collection("usuarios").document(email_reset).get()
+    if st.sidebar.button("Atualizar senha"):
 
-    if ref.exists:
-        db.collection("usuarios").document(email_reset).update({
-            "senha": hash_senha(nova_senha)
-        })
-        st.sidebar.success("Senha atualizada")
-    else:
-        st.sidebar.error("Usuário não encontrado")
+        if not senha_atual or not nova_senha:
+            st.sidebar.error("Preencha os campos")
+        else:
+            senha_salva = user.get("senha")
+
+            if not senha_salva or verificar_senha(senha_atual, senha_salva):
+
+                db.collection("usuarios").document(user["email"]).update({
+                    "senha": hash_senha(nova_senha)
+                })
+
+                st.sidebar.success("Senha atualizada com sucesso")
+
+            else:
+                st.sidebar.error("Senha atual incorreta")
 
 # ------------------------
 # BLOQUEIO
@@ -322,3 +330,50 @@ elif restante_prev <= 0:
     st.info("Meta será cumprida se seguir o planejado")
 else:
     st.warning("Risco de não bater meta")
+
+```python
+# ------------------------
+# DASHBOARD GESTOR
+# ------------------------
+if user.get("tipo") == "gestor":
+
+    st.divider()
+    st.header("👨‍💼 Equipe")
+
+    equipe = db.collection("usuarios").where("gestor", "==", user["email"]).stream()
+
+    encontrou = False
+
+    for membro in equipe:
+        encontrou = True
+        dados = membro.to_dict()
+
+        nome = dados.get("nome", "Sem nome")
+        eventos = dados.get("eventos", [])
+
+        pres = plan = home = 0
+
+        for e in eventos:
+            d = date.fromisoformat(e["start"])
+
+            if d.month == mes and d.year == ano and d.weekday() < 5:
+                t = e["title"]
+                if "🔵" in t:
+                    pres += 1
+                elif "🟡" in t:
+                    plan += 1
+                elif "Home" in t:
+                    home += 1
+
+        st.subheader(f"👤 {nome}")
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("🔵 Presencial", pres)
+        c2.metric("🟡 Planejado", plan)
+        c3.metric("🏠 Home", home)
+
+        st.divider()
+
+    if not encontrou:
+        st.info("Nenhum funcionário vinculado a você ainda")
+```
