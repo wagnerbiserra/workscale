@@ -44,7 +44,7 @@ modo = st.sidebar.radio("Acesso", ["Login", "Cadastro"])
 email = st.sidebar.text_input("Email").strip().lower()
 
 st.info(
-    "ℹ️ Este sistema foi desenvolvido para auxiliar na organização dos dias de trabalho."
+    "ℹ️ Este sistema foi desenvolvido para auxiliar na organização dos dias de trabalho. "
     "Não é uma ferramenta oficial da empresa."
 )
 # ------------------------
