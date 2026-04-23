@@ -9,6 +9,12 @@ import bcrypt
 st.set_page_config(page_title="WorkScale", layout="wide")
 
 # ------------------------
+# SESSION STATE (GLOBAL)
+# ------------------------
+
+if "last_click" not in st.session_state:
+    st.session_state.last_click = None
+# ------------------------
 # SESSION (MÊS/ANO)
 # ------------------------
 if "mes" not in st.session_state:
@@ -235,10 +241,18 @@ calendar_result = st_calendar(
 )
 
 # ------------------------
-# CLICK
+# CLICK (COM UX MELHORADA)
 # ------------------------
-if calendar_result.get("dateClick"):
+if calendar_result and calendar_result.get("dateClick"):
+
     data_str = calendar_result["dateClick"]["date"].split("T")[0]
+
+    # evita clique duplicado
+    if st.session_state.last_click == data_str:
+        st.session_state.last_click = None
+        st.stop()
+
+    st.session_state.last_click = data_str
 
     cores = {
         "🔵": "#1f77b4",
@@ -265,12 +279,13 @@ if calendar_result.get("dateClick"):
             "color": cor
         })
 
+    # 💾 salva no banco
     db.collection("usuarios").document(user["email"]).update({
         "eventos": st.session_state.eventos
     })
 
+    st.session_state.last_click = None
     st.rerun()
-
 # ------------------------
 # DASHBOARD
 # ------------------------
@@ -375,3 +390,6 @@ if user.get("tipo") == "gestor":
 
     if not encontrou:
         st.info("Nenhum funcionário vinculado a você ainda")
+
+
+
