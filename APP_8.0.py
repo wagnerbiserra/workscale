@@ -240,20 +240,23 @@ calendar_result = st_calendar(
     },
     key="calendar"
 )
-
+# ------------------------
+# SAVE (FIREBASE OTIMIZADO)
+# ------------------------
+def salvar_eventos(email, eventos):
+    try:
+        db.collection("usuarios").document(email).update({
+            "eventos": eventos
+        })
+    except Exception as e:
+        print("Erro ao salvar:", e)
 # ------------------------
 # CLICK (ESTÁVEL)
 # ------------------------
-import time
-
-if "last_action_time" not in st.session_state:
-    st.session_state.last_action_time = 0
-
 if calendar_result and calendar_result.get("dateClick"):
 
     agora = time.time()
 
-    # 🔒 evita múltiplos cliques muito rápidos (300ms)
     if agora - st.session_state.last_action_time < 0.3:
         st.stop()
 
@@ -273,23 +276,29 @@ if calendar_result and calendar_result.get("dateClick"):
 
     evento = next((e for e in st.session_state.eventos if e["start"] == data_str), None)
 
+    # ✅ LÓGICA ÚNICA (SEM DUPLICAÇÃO)
     if evento:
         if evento["title"] == tipo_dia:
             st.session_state.eventos.remove(evento)
+            mensagem = "Removido"
+            icone = "🗑️"
         else:
             evento["title"] = tipo_dia
             evento["color"] = cor
+            mensagem = f"{tipo_dia} atualizado"
+            icone = "♻️"
     else:
         st.session_state.eventos.append({
             "title": tipo_dia,
             "start": data_str,
             "color": cor
         })
+        mensagem = f"{tipo_dia} aplicado"
+        icone = "📅"
 
-    # 💾 salva
-    db.collection("usuarios").document(user["email"]).update({
-        "eventos": st.session_state.eventos
-    })
+    salvar_eventos(user["email"], st.session_state.eventos)
+
+    st.toast(mensagem, icon=icone)
 
     st.rerun()
 # ------------------------
