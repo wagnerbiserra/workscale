@@ -5,15 +5,16 @@ import holidays
 from streamlit_calendar import calendar as st_calendar
 from firebase_config import db
 import bcrypt
+import time
+
 
 st.set_page_config(page_title="WorkScale", layout="wide")
 
 # ------------------------
 # SESSION STATE (GLOBAL)
 # ------------------------
-
-if "last_click" not in st.session_state:
-    st.session_state.last_click = None
+if "last_action_time" not in st.session_state:
+    st.session_state.last_action_time = 0
 # ------------------------
 # SESSION (MÊS/ANO)
 # ------------------------
@@ -241,18 +242,24 @@ calendar_result = st_calendar(
 )
 
 # ------------------------
-# CLICK (COM UX MELHORADA)
+# CLICK (ESTÁVEL)
 # ------------------------
+import time
+
+if "last_action_time" not in st.session_state:
+    st.session_state.last_action_time = 0
+
 if calendar_result and calendar_result.get("dateClick"):
 
-    data_str = calendar_result["dateClick"]["date"].split("T")[0]
+    agora = time.time()
 
-    # evita clique duplicado
-    if st.session_state.last_click == data_str:
-        st.session_state.last_click = None
+    # 🔒 evita múltiplos cliques muito rápidos (300ms)
+    if agora - st.session_state.last_action_time < 0.3:
         st.stop()
 
-    st.session_state.last_click = data_str
+    st.session_state.last_action_time = agora
+
+    data_str = calendar_result["dateClick"]["date"].split("T")[0]
 
     cores = {
         "🔵": "#1f77b4",
@@ -279,12 +286,11 @@ if calendar_result and calendar_result.get("dateClick"):
             "color": cor
         })
 
-    # 💾 salva no banco
+    # 💾 salva
     db.collection("usuarios").document(user["email"]).update({
         "eventos": st.session_state.eventos
     })
 
-    st.session_state.last_click = None
     st.rerun()
 # ------------------------
 # DASHBOARD
@@ -390,6 +396,3 @@ if user.get("tipo") == "gestor":
 
     if not encontrou:
         st.info("Nenhum funcionário vinculado a você ainda")
-
-
-
