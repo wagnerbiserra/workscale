@@ -44,7 +44,7 @@ modo = st.sidebar.radio("Acesso", ["Login", "Cadastro"])
 email = st.sidebar.text_input("Email").strip().lower()
 
 st.info(
-    "ℹ️ Este sistema foi desenvolvido para auxiliar na organização dos dias de trabalho."
+    "ℹ️ Este sistema foi desenvolvido para auxiliar na organização dos dias de trabalho. "
     "Não é uma ferramenta oficial da empresa."
 )
 # ------------------------
@@ -419,26 +419,80 @@ if user.get("tipo") == "gestor":
 
         pres = plan = home = 0
 
-        for e in eventos:
-            d = date.fromisoformat(e["start"])
+        for membro in equipe:
+            encontrou = True
+            dados = membro.to_dict()
 
-            if d.month == mes and d.year == ano and d.weekday() < 5:
-                t = e["title"]
-                if "🔵" in t:
-                    pres += 1
-                elif "🟡" in t:
-                    plan += 1
-                elif "Home" in t:
-                    home += 1
+            nome = dados.get("nome", "Sem nome")
+            eventos = dados.get("eventos", [])
 
-        st.subheader(f"👤 {nome}")
+            pres = plan = home = ferias = banco = 0
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("🔵 Presencial", pres)
-        c2.metric("🟡 Planejado", plan)
-        c3.metric("🏠 Home", home)
+            # 🔥 listas de dias
+            dias_pres = []
+            dias_home = []
+            dias_plan = []
+            dias_ferias = []
+            dias_banco = []
 
-        st.divider()
+            for e in eventos:
+                d = date.fromisoformat(e["start"])
+
+                if d.month == mes and d.year == ano and d.weekday() < 5:
+                    t = e["title"]
+
+                    if "🔵" in t:
+                        pres += 1
+                        dias_pres.append(d.day)
+
+                    elif "🟡" in t:
+                        plan += 1
+                        dias_plan.append(d.day)
+
+                    elif "Home" in t:
+                        home += 1
+                        dias_home.append(d.day)
+
+                    elif "Férias" in t:
+                        ferias += 1
+                        dias_ferias.append(d.day)
+
+                    elif "Banco" in t:
+                        banco += 1
+                        dias_banco.append(d.day)
+
+            st.subheader(f"👤 {nome}")
+
+            # métricas
+            c1, c2, c3, c4, c5 = st.columns(5)
+            c1.metric("🔵 Presencial", pres)
+            c2.metric("🟡 Planejado", plan)
+            c3.metric("🏠 Home", home)
+            c4.metric("🌴 Férias", ferias)
+            c5.metric("🟣 Banco", banco)
+
+            # 🔥 detalhamento dos dias
+            st.markdown("**📅 Detalhamento:**")
+
+            if dias_pres:
+                st.write(f"🔵 Presencial: {sorted(dias_pres)}")
+
+            if dias_plan:
+                st.write(f"🟡 Planejado: {sorted(dias_plan)}")
+
+            if dias_home:
+                st.write(f"🏠 Home: {sorted(dias_home)}")
+
+            if dias_ferias:
+                st.write(f"🌴 Férias: {sorted(dias_ferias)}")
+
+            if dias_banco:
+                st.write(f"🟣 Banco: {sorted(dias_banco)}")
+
+            if not any([dias_pres, dias_plan, dias_home, dias_ferias, dias_banco]):
+                st.write("Nenhum registro no mês")
+
+            st.divider()
 
     if not encontrou:
         st.info("Nenhum funcionário vinculado a você ainda")
