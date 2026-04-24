@@ -83,7 +83,7 @@ if modo == "Cadastro":
                     "email": email.strip().lower(),
                     "senha": hash_senha(senha),
                     "tipo": "gestor" if tipo_usuario == "👨‍💼 Gestor" else "funcionario",
-                    "gestor": gestor.strip().lower(),
+                    "gestor": gestor.strip().lower() if tipo_usuario == "👤 Funcionário" else None,
                     "eventos": []
                 })
 
