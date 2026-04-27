@@ -174,7 +174,8 @@ tipo_dia = st.selectbox(
         "🏠 Home Office",
         "🌴 Férias",
         "🟣 Banco",
-        "🟢 Folga"  # 👈 NOVO
+        "🟢 Folga",
+        "🎂 Day Off"  # 👈 NOVO
     ]
 )
 
@@ -365,102 +366,65 @@ def salvar_eventos(email, eventos):
     except Exception as e:
         print("Erro ao salvar:", e)
 # ------------------------
-# CLICK (CORRIGIDO)
+# CLICK (ESTÁVEL)
 # ------------------------
+if calendar_result and calendar_result.get("dateClick"):
 
-if "modo_edicao" not in st.session_state:
-    st.session_state.modo_edicao = False
+    agora = time.time()
 
-if "data_selecionada" not in st.session_state:
-    st.session_state.data_selecionada = None
+    if agora - st.session_state.last_action_time < 0.3:
+        st.stop()
 
-if calendar_result and isinstance(calendar_result, dict):
+    st.session_state.last_action_time = agora
 
-    date_click = calendar_result.get("dateClick")
+    data_str = calendar_result["dateClick"]["date"].split("T")[0]
 
-    if date_click and "date" in date_click:
+    cores = {
+        "🔵": "#1f77b4",
+        "🟡": "#ffcc00",
+        "🏠": "#2ca02c",
+        "🌴": "#ff7f0e",
+        "🟣": "#9467bd",
+        "🟢": "#17becf",
+        "🎂": "#ff69b4"  # 👈 rosa (aniversário)
+    }
 
-        agora = time.time()
+    cor = next((cores[k] for k in cores if k in tipo_dia), "#000")
 
-        if agora - st.session_state.last_action_time < 0.3:
-            st.stop()
+    evento = next((e for e in st.session_state.eventos if e["start"] == data_str), None)
 
-        st.session_state.last_action_time = agora
-
-        data_str = date_click["date"].split("T")[0]
-
-        st.session_state.data_selecionada = data_str
-        st.session_state.modo_edicao = True
-
-        st.rerun()
-# ------------------------
-# CRIA POPUP
-# ------------------------
-if st.session_state.get("modo_edicao", False):
-
-    st.subheader(f"📅 Editar dia: {st.session_state.data_selecionada}")
-
-    tipo_popup = st.selectbox(
-        "Tipo do dia",
-        [
-            "🔵 Presencial",
-            "🟡 Planejado Presencial",
-            "🏠 Home Office",
-            "🌴 Férias",
-            "🟣 Banco",
-            "🟢 Folga"
-        ],
-        key="tipo_popup"
-    )
-
-    col1, col2 = st.columns(2)
-
-    if col1.button("Salvar"):
-
-        data_str = st.session_state.data_selecionada
-
-        cores = {
-            "🔵": "#1f77b4",
-            "🟡": "#ffcc00",
-            "🏠": "#2ca02c",
-            "🌴": "#ff7f0e",
-            "🟣": "#9467bd",
-            "🟢": "#17becf"
-        }
-
-        cor = next((cores[k] for k in cores if k in tipo_popup), "#000")
-
-        evento = next(
-            (e for e in st.session_state.eventos if e["start"] == data_str),
-            None
-        )
-
-        if evento:
-            evento["title"] = tipo_popup
-            evento["color"] = cor
+    # ✅ LÓGICA ÚNICA (SEM DUPLICAÇÃO)
+    if evento:
+        if evento["title"] == tipo_dia:
+            st.session_state.eventos.remove(evento)
+            mensagem = "Removido"
+            icone = "🗑️"
         else:
-            st.session_state.eventos.append({
-                "title": tipo_popup,
-                "start": data_str,
-                "color": cor
-            })
+            evento["title"] = tipo_dia
+            evento["color"] = cor
+            mensagem = f"{tipo_dia} atualizado"
+            icone = "♻️"
+    else:
+        st.session_state.eventos.append({
+            "title": tipo_dia,
+            "start": data_str,
+            "color": cor
+        })
+        mensagem = f"{tipo_dia} aplicado"
+        icone = "📅"
 
-        salvar_eventos(user["email"], st.session_state.eventos)
+    salvar_eventos(user["email"], st.session_state.eventos)
 
-        st.session_state.modo_edicao = False
+    st.toast(mensagem, icon=icone)
 
-        st.rerun()
-
-    if col2.button("Cancelar"):
-        st.session_state.modo_edicao = False
-        st.rerun()
+    st.rerun()
 # ------------------------
 # DASHBOARD (CONTAGEM CORRETA COM AUTO)
 # ------------------------
 
 hoje = date.today()
 
-presencial = planejado = planejado_vencido = home = ferias = banco = folga = 0
+presencial = planejado = planejado_vencido = home = ferias = banco = folga = dayoff = 0
 
 for e in eventos_usuario:
     d = date.fromisoformat(e["start"])
@@ -490,13 +454,16 @@ for e in eventos_usuario:
         elif "Folga" in t:
             folga += 1
 
+        elif "Day Off" in t:
+            dayoff += 1
+
 # ------------------------
 # NÃO ÚTEIS
 # ------------------------
 
 total_nao_uteis = len(feriados_uteis) + len(emendas_uteis)
 
-dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga), 0)
+dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga + dayoff), 0)
 meta = int(dias_validos * 0.6)
 
 restante = meta - presencial
@@ -518,14 +485,15 @@ c8.metric("🏢 Meta", meta)
 
 st.divider()
 
-c9, c10, c11, c12, c13, c14 = st.columns(6)
+c9, c10, c11, c12, c13, c14, c15 = st.columns(7)
 
 c9.metric("🔵 Real", presencial)
 c10.metric("🟡 Planejado", planejado)
 c11.metric("⚠️ Vencido", planejado_vencido)
 c12.metric("🏠 Home", home)
 c13.metric("🟢 Folga", folga)
-c14.metric("📌 Faltam", max(restante, 0))
+c14.metric("🎂 Day Off", dayoff)
+c15.metric("📌 Faltam", max(restante, 0))
 
 st.metric("📊 Previsto", max(restante_prev, 0))
 
@@ -546,7 +514,7 @@ def calcular_status(eventos, ano, mes, uteis, feriados_uteis, emendas_uteis):
     hoje = date.today()
 
     presencial = planejado = planejado_vencido = 0
-    home = ferias = banco = folga = 0
+    home = ferias = banco = folga = dayoff = 0
 
     for e in eventos:
         d = date.fromisoformat(e["start"])
@@ -575,9 +543,12 @@ def calcular_status(eventos, ano, mes, uteis, feriados_uteis, emendas_uteis):
             elif "Folga" in t:
                 folga += 1
 
+            elif "Day Off" in t:
+                dayoff += 1
+
     total_nao_uteis = len(feriados_uteis) + len(emendas_uteis)
 
-    dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga), 0)
+    dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga + dayoff), 0)
     meta = int(dias_validos * 0.6)
 
     restante = meta - presencial
@@ -703,5 +674,3 @@ if user.get("tipo") == "gestor":
 
     if not encontrou:
         st.info("Nenhum funcionário vinculado a você ainda")
-
-st.write(calendar_result)

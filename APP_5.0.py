@@ -174,7 +174,8 @@ tipo_dia = st.selectbox(
         "🏠 Home Office",
         "🌴 Férias",
         "🟣 Banco",
-        "🟢 Folga"  # 👈 NOVO
+        "🟢 Folga",
+        "🎂 Day Off"  # 👈 NOVO
     ]
 )
 
@@ -384,7 +385,8 @@ if calendar_result and calendar_result.get("dateClick"):
         "🏠": "#2ca02c",
         "🌴": "#ff7f0e",
         "🟣": "#9467bd",
-        "🟢": "#17becf"  # 👈 cor da folga
+        "🟢": "#17becf",
+        "🎂": "#ff69b4"  # 👈 rosa (aniversário)
     }
 
     cor = next((cores[k] for k in cores if k in tipo_dia), "#000")
@@ -422,7 +424,7 @@ if calendar_result and calendar_result.get("dateClick"):
 
 hoje = date.today()
 
-presencial = planejado = planejado_vencido = home = ferias = banco = folga = 0
+presencial = planejado = planejado_vencido = home = ferias = banco = folga = dayoff = 0
 
 for e in eventos_usuario:
     d = date.fromisoformat(e["start"])
@@ -452,13 +454,16 @@ for e in eventos_usuario:
         elif "Folga" in t:
             folga += 1
 
+        elif "Day Off" in t:
+            dayoff += 1
+
 # ------------------------
 # NÃO ÚTEIS
 # ------------------------
 
 total_nao_uteis = len(feriados_uteis) + len(emendas_uteis)
 
-dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga), 0)
+dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga + dayoff), 0)
 meta = int(dias_validos * 0.6)
 
 restante = meta - presencial
@@ -480,14 +485,15 @@ c8.metric("🏢 Meta", meta)
 
 st.divider()
 
-c9, c10, c11, c12, c13, c14 = st.columns(6)
+c9, c10, c11, c12, c13, c14, c15 = st.columns(7)
 
 c9.metric("🔵 Real", presencial)
 c10.metric("🟡 Planejado", planejado)
 c11.metric("⚠️ Vencido", planejado_vencido)
 c12.metric("🏠 Home", home)
 c13.metric("🟢 Folga", folga)
-c14.metric("📌 Faltam", max(restante, 0))
+c14.metric("🎂 Day Off", dayoff)
+c15.metric("📌 Faltam", max(restante, 0))
 
 st.metric("📊 Previsto", max(restante_prev, 0))
 
@@ -508,7 +514,7 @@ def calcular_status(eventos, ano, mes, uteis, feriados_uteis, emendas_uteis):
     hoje = date.today()
 
     presencial = planejado = planejado_vencido = 0
-    home = ferias = banco = folga = 0
+    home = ferias = banco = folga = dayoff = 0
 
     for e in eventos:
         d = date.fromisoformat(e["start"])
@@ -537,9 +543,12 @@ def calcular_status(eventos, ano, mes, uteis, feriados_uteis, emendas_uteis):
             elif "Folga" in t:
                 folga += 1
 
+            elif "Day Off" in t:
+                dayoff += 1
+
     total_nao_uteis = len(feriados_uteis) + len(emendas_uteis)
 
-    dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga), 0)
+    dias_validos = max(uteis - (total_nao_uteis + ferias + banco + folga + dayoff), 0)
     meta = int(dias_validos * 0.6)
 
     restante = meta - presencial
