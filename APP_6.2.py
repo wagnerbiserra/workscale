@@ -365,57 +365,95 @@ def salvar_eventos(email, eventos):
     except Exception as e:
         print("Erro ao salvar:", e)
 # ------------------------
-# CLICK (ESTÁVEL)
+# CLICK (CORRIGIDO)
 # ------------------------
-if calendar_result and calendar_result.get("dateClick"):
 
-    agora = time.time()
+if "modo_edicao" not in st.session_state:
+    st.session_state.modo_edicao = False
 
-    if agora - st.session_state.last_action_time < 0.3:
-        st.stop()
+if "data_selecionada" not in st.session_state:
+    st.session_state.data_selecionada = None
 
-    st.session_state.last_action_time = agora
+if calendar_result and isinstance(calendar_result, dict):
 
-    data_str = calendar_result["dateClick"]["date"].split("T")[0]
+    date_click = calendar_result.get("dateClick")
 
-    cores = {
-        "🔵": "#1f77b4",
-        "🟡": "#ffcc00",
-        "🏠": "#2ca02c",
-        "🌴": "#ff7f0e",
-        "🟣": "#9467bd",
-        "🟢": "#17becf"  # 👈 cor da folga
-    }
+    if date_click and "date" in date_click:
 
-    cor = next((cores[k] for k in cores if k in tipo_dia), "#000")
+        agora = time.time()
 
-    evento = next((e for e in st.session_state.eventos if e["start"] == data_str), None)
+        if agora - st.session_state.last_action_time < 0.3:
+            st.stop()
 
-    # ✅ LÓGICA ÚNICA (SEM DUPLICAÇÃO)
-    if evento:
-        if evento["title"] == tipo_dia:
-            st.session_state.eventos.remove(evento)
-            mensagem = "Removido"
-            icone = "🗑️"
-        else:
-            evento["title"] = tipo_dia
+        st.session_state.last_action_time = agora
+
+        data_str = date_click["date"].split("T")[0]
+
+        st.session_state.data_selecionada = data_str
+        st.session_state.modo_edicao = True
+
+        st.rerun()
+# ------------------------
+# CRIA POPUP
+# ------------------------
+if st.session_state.get("modo_edicao", False):
+
+    st.subheader(f"📅 Editar dia: {st.session_state.data_selecionada}")
+
+    tipo_popup = st.selectbox(
+        "Tipo do dia",
+        [
+            "🔵 Presencial",
+            "🟡 Planejado Presencial",
+            "🏠 Home Office",
+            "🌴 Férias",
+            "🟣 Banco",
+            "🟢 Folga"
+        ],
+        key="tipo_popup"
+    )
+
+    col1, col2 = st.columns(2)
+
+    if col1.button("Salvar"):
+
+        data_str = st.session_state.data_selecionada
+
+        cores = {
+            "🔵": "#1f77b4",
+            "🟡": "#ffcc00",
+            "🏠": "#2ca02c",
+            "🌴": "#ff7f0e",
+            "🟣": "#9467bd",
+            "🟢": "#17becf"
+        }
+
+        cor = next((cores[k] for k in cores if k in tipo_popup), "#000")
+
+        evento = next(
+            (e for e in st.session_state.eventos if e["start"] == data_str),
+            None
+        )
+
+        if evento:
+            evento["title"] = tipo_popup
             evento["color"] = cor
-            mensagem = f"{tipo_dia} atualizado"
-            icone = "♻️"
-    else:
-        st.session_state.eventos.append({
-            "title": tipo_dia,
-            "start": data_str,
-            "color": cor
-        })
-        mensagem = f"{tipo_dia} aplicado"
-        icone = "📅"
+        else:
+            st.session_state.eventos.append({
+                "title": tipo_popup,
+                "start": data_str,
+                "color": cor
+            })
 
-    salvar_eventos(user["email"], st.session_state.eventos)
+        salvar_eventos(user["email"], st.session_state.eventos)
 
-    st.toast(mensagem, icon=icone)
+        st.session_state.modo_edicao = False
 
-    st.rerun()
+        st.rerun()
+
+    if col2.button("Cancelar"):
+        st.session_state.modo_edicao = False
+        st.rerun()
 # ------------------------
 # DASHBOARD (CONTAGEM CORRETA COM AUTO)
 # ------------------------
@@ -665,3 +703,5 @@ if user.get("tipo") == "gestor":
 
     if not encontrou:
         st.info("Nenhum funcionário vinculado a você ainda")
+
+st.write(calendar_result)
