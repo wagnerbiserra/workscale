@@ -44,8 +44,16 @@ modo = st.sidebar.radio("Acesso", ["Login", "Cadastro"])
 email = st.sidebar.text_input("Email").strip().lower()
 
 st.info(
-    "ℹ️ Este sistema foi desenvolvido para auxiliar na organização dos dias de trabalho. "
-    "Não é uma ferramenta oficial da empresa."
+    """
+ℹ️ **WorkScale**
+
+Este sistema foi desenvolvido para auxiliar na organização dos dias de trabalho.  
+
+Não é uma ferramenta oficial da empresa!!.
+
+💡 **Dica:**  
+Para quem trabalha aos finais de semana e folga durante a semana, utilize a opção **🔄 Folga Plantão**.
+"""
 )
 # ------------------------
 # CADASTRO
