@@ -572,7 +572,7 @@ if presencial > meta:
     c16.metric("📈 Excedente", excedente)
 
 elif presencial == meta:
-    c16.metric("✅ Meta", "Completa")
+    c16.metric("✅ Meta", "OK")
 
 else:
     faltam = meta - presencial
